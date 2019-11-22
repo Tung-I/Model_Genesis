@@ -3,6 +3,7 @@ import random
 import functools
 import numpy as np
 import SimpleITK as sitk
+from scipy.special import comb
 from skimage.transform import resize
 from skimage.morphology import label
 
@@ -97,6 +98,297 @@ class ToTensor(BaseTransform):
         else:
             imgs = tuple(img.float() for img in map(torch.from_numpy, imgs))
         return imgs
+
+
+class HUNormalize(BaseTransform):
+    """Normalize a tuple of images by HU values.
+    Args:
+        hu_max (float): upper bound of HU values
+        hu_min (float): lower bound of HU values
+    """
+    def __init__(self, hu_max, hu_min):
+        self.hu_max = hu_max
+        self.hu_min = hu_min
+
+    def __call__(self, *imgs, normalize_tags=None, **kwargs):
+        """
+        Args:
+            imgs (tuple of numpy.ndarray): The images to be normalized.
+            normalize_tags (sequence of bool, optional): The corresponding tags of the images (default: None, normalize all the images).
+
+        Returns:
+            imgs (tuple of numpy.ndarray): The normalized images.
+        """
+        if not all(isinstance(img, np.ndarray) for img in imgs):
+            raise TypeError('All of the images should be numpy.ndarray.')
+
+        if normalize_tags:
+            if len(normalize_tags) != len(imgs):
+                raise ValueError('The number of the tags should be the same as the images.')
+            if not all(normalize_tag in [True, False] for normalize_tag in normalize_tags):
+                raise ValueError("All of the tags should be either True or False.")
+        else:
+            normalize_tags = [None] * len(imgs)
+
+        _imgs = []
+        for img, normalize_tag in zip(imgs, normalize_tags):
+            if normalize_tag is None or normalize_tag is True:
+                img = self._normalize(img, self.hu_max, self.hu_min)
+            elif normalize_tag is False:
+                pass
+            _imgs.append(img)
+        imgs = tuple(_imgs)
+        return imgs
+
+    @staticmethod
+    def _normalize(img, hu_max, hu_min):
+        """Normalize the image with the means and the standard deviations.
+        Args:
+            img (numpy.ndarray): The image to be normalized.
+            hu_max (float): upper bound of HU values
+            hu_min (float): lower bound of HU values
+
+        Returns:
+            img (numpy.ndarray): The normalized image.
+        """
+        img = img.copy()
+        img = (img - hu_min) / (hu_max - hu_min)
+        img[img>1] = 1.
+        img[img<0] = 0.
+        return img
+
+
+class NonLinearTransform(BaseTransform):
+    """
+    Args:
+        hu_max (float): upper bound of HU values
+        hu_min (float): lower bound of HU values
+    """
+    def __init__(self, prob=0.5):
+        self.prob = prob
+
+    def __call__(self, *imgs, **kwargs):
+        """
+        Args:
+            imgs (tuple of numpy.ndarray): The images to be transform.
+
+        Returns:
+            imgs (tuple of numpy.ndarray): The transformed images.
+        """
+        if not all(isinstance(img, np.ndarray) for img in imgs):
+            raise TypeError('All of the images should be numpy.ndarray.')
+
+        _imgs = []
+        for img in imgs:
+            img = self._nonlinear_transform(img, self.prob)
+            _imgs.append(img)
+        imgs = tuple(_imgs)
+        return imgs
+
+    @staticmethod
+    def _bernstein_poly(i, n, t):
+        """
+         The Bernstein polynomial of n, i as a function of t
+        """
+        return comb(n, i) * ( t**(n-i) ) * (1 - t)**i
+
+    def _bezier_curve(points, nTimes=1000):
+        """
+           Given a set of control points, return the
+           bezier curve defined by the control points.
+           Control points should be a list of lists, or list of tuples
+           such as [ [1,1], 
+                     [2,3], 
+                     [4,5], ..[Xn, Yn] ]
+            nTimes is the number of time steps, defaults to 1000
+            See http://processingjs.nihongoresources.com/bezierinfo/
+        """
+        nPoints = len(points)
+        xPoints = np.array([p[0] for p in points])
+        yPoints = np.array([p[1] for p in points])
+
+        t = np.linspace(0.0, 1.0, nTimes)
+
+        polynomial_array = np.array([ _bernstein_poly(i, nPoints-1, t) for i in range(0, nPoints)   ])
+        
+        xvals = np.dot(xPoints, polynomial_array)
+        yvals = np.dot(yPoints, polynomial_array)
+
+        return xvals, yvals
+
+
+    def _nonlinear_transform(x, prob=0.5):
+        if random.random() >= prob:
+            return x
+        points = [[0, 0], [random.random(), random.random()], [random.random(), random.random()], [1, 1]]
+        xpoints = [p[0] for p in points]
+        ypoints = [p[1] for p in points]
+        xvals, yvals = _bezier_curve(points, nTimes=100000)
+        if random.random() < 0.5:
+            # Half change to get flip
+            xvals = np.sort(xvals)
+        else:
+            xvals, yvals = np.sort(xvals), np.sort(yvals)
+        nonlinear_x = np.interp(x, xvals, yvals)
+        return nonlinear_x
+
+
+class LocalPixelShuffling(BaseTransform):
+    """
+    Args:
+        hu_max (float): upper bound of HU values
+        hu_min (float): lower bound of HU values
+    """
+    def __init__(self, x_size, y_size, z_size, prob=0.5):
+        self.x_size = x_size
+        self.y_size = y_size
+        self.z_size = z_size
+        self.prob = prob
+
+    def __call__(self, *imgs, **kwargs):
+        """
+        Args:
+            imgs (tuple of numpy.ndarray): The images to be transform.
+
+        Returns:
+            imgs (tuple of numpy.ndarray): The transformed images.
+        """
+        if not all(isinstance(img, np.ndarray) for img in imgs):
+            raise TypeError('All of the images should be numpy.ndarray.')
+
+        _imgs = []
+        for img in imgs:
+            img = self._local_pixel_shuffling(img, self.x_size, self.y_size, self.z_size, self.prob)
+            _imgs.append(img)
+        imgs = tuple(_imgs)
+        return imgs
+
+    @staticmethod
+    def _local_pixel_shuffling(img, x_size, y_size, z_size, prob=0.5):
+                """
+        Args:
+            img (dim=3): The images to be transform.
+            _size: The shuffle window size of that dimension.
+
+        Returns:
+            imgs (numpy.ndarray): The transformed images.
+        """
+        if random.random() >= prob:
+            return img
+        image_temp = copy.deepcopy(img)
+        orig_image = copy.deepcopy(img)
+        img_rows, img_cols, img_deps = img.shape
+        num_block = 10000
+        for _ in range(num_block):
+            block_noise_size_x = x_size
+            block_noise_size_y = y_size
+            block_noise_size_z = z_size
+            noise_x = random.randint(0, img_rows-block_noise_size_x)
+            noise_y = random.randint(0, img_cols-block_noise_size_y)
+            noise_z = random.randint(0, img_deps-block_noise_size_z)
+            window = orig_image[noise_x:noise_x+block_noise_size_x, 
+                                noise_y:noise_y+block_noise_size_y, 
+                                noise_z:noise_z+block_noise_size_z,
+                               ]
+            window = window.flatten()
+            np.random.shuffle(window)
+            window = window.reshape((block_noise_size_x, 
+                                     block_noise_size_y, 
+                                     block_noise_size_z))
+            image_temp[noise_x:noise_x+block_noise_size_x, 
+                       noise_y:noise_y+block_noise_size_y, 
+                       noise_z:noise_z+block_noise_size_z] = window
+        local_shuffling_x = image_temp
+
+        return local_shuffling_x
+
+
+class InOutPainting(BaseTransform):
+    """
+    Args:
+        paint_rate: probability of painting
+        inpaint_rate: probability of in-painting
+    """
+    def __init__(self, paint_rate, inpaint_rate):
+        self.paint_rate = paint_rate
+        self.inpaint_rate = inpaint_rate
+
+    def __call__(self, *imgs, **kwargs):
+        """
+        Args:
+            imgs (tuple of numpy.ndarray): The images to be transform.
+
+        Returns:
+            imgs (tuple of numpy.ndarray): The transformed images.
+        """
+        if not all(isinstance(img, np.ndarray) for img in imgs):
+            raise TypeError('All of the images should be numpy.ndarray.')
+
+        _imgs = []
+        for img in imgs:
+            img = self._in_out_painting(img, self.paint_rate, self.inpaint_rate)
+            _imgs.append(img)
+        imgs = tuple(_imgs)
+        return imgs
+
+    @staticmethod
+    def _in_out_painting(img, paint_rate, inpaint_rate):
+        if random.random() < config.paint_rate:
+            if random.random() < config.inpaint_rate:
+                img = _image_in_painting(img)
+            else:
+                img = _image_out_painting(img)
+        return img
+
+    def _image_in_painting(x):
+    img_rows, img_cols, img_deps = x.shape
+    cnt = 5
+    while cnt > 0 and random.random() < 0.95:
+        block_noise_size_x = random.randint(img_rows//6, img_rows//3)
+        block_noise_size_y = random.randint(img_cols//6, img_cols//3)
+        block_noise_size_z = random.randint(img_deps//6, img_deps//3)
+        noise_x = random.randint(3, img_rows-block_noise_size_x-3)
+        noise_y = random.randint(3, img_cols-block_noise_size_y-3)
+        noise_z = random.randint(3, img_deps-block_noise_size_z-3)
+        print(f'{noise_x}, {noise_y}, {noise_z}')
+        x[noise_x:noise_x+block_noise_size_x, 
+          noise_y:noise_y+block_noise_size_y, 
+          noise_z:noise_z+block_noise_size_z] = np.random.rand(block_noise_size_x, 
+                                                               block_noise_size_y, 
+                                                               block_noise_size_z, ) * 1.0
+        cnt-=1
+    return x
+
+    def _image_out_painting(x):
+        img_rows, img_cols, img_deps = x.shape
+        image_temp = copy.deepcopy(x)
+        x = np.random.rand(x.shape[0], x.shape[1], x.shape[2]) * 1.0
+        block_noise_size_x = img_rows - random.randint(3*img_rows//7, 4*img_rows//7)
+        block_noise_size_y = img_cols - random.randint(3*img_cols//7, 4*img_cols//7)
+        block_noise_size_z = img_deps - random.randint(3*img_deps//7, 4*img_deps//7)
+        noise_x = random.randint(3, img_rows-block_noise_size_x-3)
+        noise_y = random.randint(3, img_cols-block_noise_size_y-3)
+        noise_z = random.randint(3, img_deps-block_noise_size_z-3)
+        x[noise_x:noise_x+block_noise_size_x, 
+          noise_y:noise_y+block_noise_size_y, 
+          noise_z:noise_z+block_noise_size_z] = image_temp[noise_x:noise_x+block_noise_size_x, 
+                                                           noise_y:noise_y+block_noise_size_y, 
+                                                           noise_z:noise_z+block_noise_size_z]
+        cnt = 15
+        while cnt > 0:
+            block_noise_size_x = img_rows - random.randint(3*img_rows//7, 4*img_rows//7)
+            block_noise_size_y = img_cols - random.randint(3*img_cols//7, 4*img_cols//7)
+            block_noise_size_z = img_deps - random.randint(3*img_deps//7, 4*img_deps//7)
+            noise_x = random.randint(3, img_rows-block_noise_size_x-3)
+            noise_y = random.randint(3, img_cols-block_noise_size_y-3)
+            noise_z = random.randint(3, img_deps-block_noise_size_z-3)
+            x[noise_x:noise_x+block_noise_size_x, 
+              noise_y:noise_y+block_noise_size_y, 
+              noise_z:noise_z+block_noise_size_z] = image_temp[noise_x:noise_x+block_noise_size_x, 
+                                                               noise_y:noise_y+block_noise_size_y, 
+                                                               noise_z:noise_z+block_noise_size_z]
+            cnt-=1
+        return x
 
 
 class Normalize(BaseTransform):
