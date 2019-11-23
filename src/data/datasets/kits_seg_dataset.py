@@ -48,8 +48,10 @@ class KitsSegDataset(BaseDataset):
         if self.type == 'train':
             image, label = self.train_preprocessings(image, label, normalize_tags=[True, False], target=label, target_label=2)
             image, label = self.augments(image, label, elastic_deformation_orders=[3, 0])
+
         elif self.type == 'valid':
             image, label = self.valid_preprocessings(image, label, normalize_tags=[True, False], target=label, target_label=2)
+
 
         image, label = self.transforms(image, label, dtypes=[torch.float, torch.long])
         image, label = image.permute(3, 2, 0, 1).contiguous(), label.permute(3, 2, 0, 1).contiguous()

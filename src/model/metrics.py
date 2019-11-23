@@ -4,6 +4,15 @@ import numpy as np
 from skimage.morphology import label
 
 
+class MSE(nn.Module):
+    """The mean square error for the autoencoder task.
+    """
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, output, target):
+        return ((output - target)**2).mean()
+
 class Dice(nn.Module):
     """The Dice score.
     """

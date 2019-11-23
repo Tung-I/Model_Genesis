@@ -3,6 +3,8 @@ import glob
 import torch
 import numpy as np
 import nibabel as nib
+import copy
+import SimpleITK as sitk
 
 from src.data.datasets.base_dataset import BaseDataset
 from src.data.transforms import compose
@@ -31,26 +33,35 @@ class MGDataset(BaseDataset):
         with open(self.data_split_csv, "r") as f:
             type_ = 'Training' if self.type == 'train' else 'Validation'
             rows = csv.reader(f)
-            for case_name, split_type in rows:
+            for dir_name, split_type in rows:
                 if split_type == type_:
-                    image_path = self.data_dir / f'{case_name}' / 'imaging.nii.gz'
-                    label_path = self.data_dir / f'{case_name}' / 'segmentation.nii.gz'
-                    self.data_paths.append([image_path, label_path])
+                    paths = sorted(list((self.data_dir / dir_name).glob('*.mhd')))
+                    self.data_paths.extend(paths)
 
     def __len__(self):
         return len(self.data_paths)
 
     def __getitem__(self, index):
-        image_path, label_path = self.data_paths[index]
-        image, label = nib.load(str(image_path)).get_data().astype(np.float32), nib.load(str(label_path)).get_data().astype(np.int64)
+        image_path = self.data_paths[index]
+        itkimage = sitk.ReadImage(str(image_path))
+        image = sitk.GetArrayFromImage(itkimage)
+        label = copy.deepcopy(image)
+
+        # (D, H, W) -> (H, W, D, C)
         image, label = image.transpose(1, 2, 0)[..., None], label.transpose(1, 2, 0)[..., None]
 
+        # normalize and crop
         if self.type == 'train':
-            image, label = self.train_preprocessings(image, label, normalize_tags=[True, False], target=label, target_label=2)
+            image, label = self.train_preprocessings(image, label, normalize_tags=[True, True], target=label, target_label=2)
             image, label = self.augments(image, label, elastic_deformation_orders=[3, 0])
         elif self.type == 'valid':
-            image, label = self.valid_preprocessings(image, label, normalize_tags=[True, False], target=label, target_label=2)
+            image, label = self.valid_preprocessings(image, label, normalize_tags=[True, True], target=label, target_label=2)
+        # transformations
+        image, label = self.transforms(image, label, dtypes=[torch.float, torch.float])
 
-        image, label = self.transforms(image, label, dtypes=[torch.float, torch.long])
+        # (H, W, D, C) -> (C, D, H, W)
         image, label = image.permute(3, 2, 0, 1).contiguous(), label.permute(3, 2, 0, 1).contiguous()
+
+
+
         return {"image": image, "label": label}

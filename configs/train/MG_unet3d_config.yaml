@@ -1,28 +1,46 @@
 main:
     random_seed: 'nips2019'
-    saved_dir: '/home/tony/Model_Genesis/models/kits_seg/unet3d/train'
+    saved_dir: '/home/tony/Model_Genesis/models/MG/unet3d/train'
 
 dataset:
-    name: 'KitsSegDataset'
+    name: 'MGDataset'
     kwargs:
-        data_dir: '/home/tony/datasets/kits19/data'
-        data_split_csv: '/home/tony/Model_Genesis/kits_split.csv'
+        data_dir: '/home/tony/datasets/LUNA'
+        data_split_csv: '/home/tony/Model_Genesis/LUNA_split.csv'
         train_preprocessings:
-            - name: 'Normalize'
+            - name: 'HUNormalize'
+              kwargs:
+                  hu_max: 1000.
+                  hu_min: -1000.
             - name: 'RandomCrop'
               kwargs:
                   size: [128, 128, 24]
         valid_preprocessings:
-            - name: 'Normalize'
-            - name: 'PositiveCrop'
+            - name: 'HUNormalize'
               kwargs:
-                  positive_sampling_rate: 1.0
+                  hu_max: 1000.
+                  hu_min: -1000.
+            - name: 'RandomCrop'
+              kwargs:
                   size: [128, 128, 24]
         # augments:
         #     - name: 'RandomElasticDeformation'
         #     - name: 'RandomHorizontalFlip'
         #     - name: 'RandomVerticalFlip'
         transforms:
+            - name: 'NonLinearTransform'
+              kwargs:
+                  prob: 0.3
+            - name: 'LocalPixelShuffling'
+              kwargs:
+                  x_size: 10
+                  y_size: 10
+                  z_size: 10
+                  prob: 0.3
+            - name: 'InOutPainting'
+              kwargs:
+                  paint_rate: 0.3
+                  inpaint_rate: 0.5
             - name: 'ToTensor'
             
 dataloader:
@@ -34,18 +52,18 @@ dataloader:
         num_workers: 4
 
 net:
-    name: 'UNet3D'
+    name: 'MGUNet3D'
     kwargs:
         in_channels: 1
-        out_channels: 3
+        out_channels: 1
         num_features: [32, 64, 128, 256, 512]
         
 losses:
-    - name: 'DiceLoss'
+    - name: 'MSELoss'
       weight: 1.0
 
 metrics:
-    - name: 'Dice'
+    - name: 'MSE'
 
 optimizer:
     name: 'Adam'
@@ -55,7 +73,7 @@ optimizer:
         amsgrad: false
 
 logger:
-    name: 'KitsSegLogger'
+    name: 'MGLogger'
     kwargs:
         dummy_input: [16, 1, 128, 128]
 
@@ -68,7 +86,7 @@ monitor:
         early_stop: 0
 
 trainer:
-    name: 'KitsSegTrainer'
+    name: 'MGTrainer'
     kwargs:
         device: 'cuda:0'
         num_epochs: 400

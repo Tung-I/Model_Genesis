@@ -19,7 +19,7 @@ def compose(transforms=None):
         transforms (Compose): The list of BaseTransform.
     """
     if transforms is None:
-        return Compose([ToTensor()])
+        return Compose(None)
 
     _transforms = []
     for transform in transforms:
@@ -57,6 +57,9 @@ class Compose(BaseTransform):
         Returns:
             imgs (tuple of torch.Tensor): The transformed images.
         """
+        if self.transforms is None:
+            return imgs
+
         for transform in self.transforms:
             imgs = transform(*imgs, **kwargs)
 
@@ -180,6 +183,8 @@ class NonLinearTransform(BaseTransform):
 
         _imgs = []
         for img in imgs:
+            img = np.squeeze(img)
+            print(img.shape)
             img = self._nonlinear_transform(img, self.prob)
             _imgs.append(img)
         imgs = tuple(_imgs)
@@ -265,7 +270,7 @@ class LocalPixelShuffling(BaseTransform):
 
     @staticmethod
     def _local_pixel_shuffling(img, x_size, y_size, z_size, prob=0.5):
-                """
+        """
         Args:
             img (dim=3): The images to be transform.
             _size: The shuffle window size of that dimension.
@@ -341,23 +346,23 @@ class InOutPainting(BaseTransform):
         return img
 
     def _image_in_painting(x):
-    img_rows, img_cols, img_deps = x.shape
-    cnt = 5
-    while cnt > 0 and random.random() < 0.95:
-        block_noise_size_x = random.randint(img_rows//6, img_rows//3)
-        block_noise_size_y = random.randint(img_cols//6, img_cols//3)
-        block_noise_size_z = random.randint(img_deps//6, img_deps//3)
-        noise_x = random.randint(3, img_rows-block_noise_size_x-3)
-        noise_y = random.randint(3, img_cols-block_noise_size_y-3)
-        noise_z = random.randint(3, img_deps-block_noise_size_z-3)
-        print(f'{noise_x}, {noise_y}, {noise_z}')
-        x[noise_x:noise_x+block_noise_size_x, 
-          noise_y:noise_y+block_noise_size_y, 
-          noise_z:noise_z+block_noise_size_z] = np.random.rand(block_noise_size_x, 
-                                                               block_noise_size_y, 
-                                                               block_noise_size_z, ) * 1.0
-        cnt-=1
-    return x
+        img_rows, img_cols, img_deps = x.shape
+        cnt = 5
+        while cnt > 0 and random.random() < 0.95:
+            block_noise_size_x = random.randint(img_rows//6, img_rows//3)
+            block_noise_size_y = random.randint(img_cols//6, img_cols//3)
+            block_noise_size_z = random.randint(img_deps//6, img_deps//3)
+            noise_x = random.randint(3, img_rows-block_noise_size_x-3)
+            noise_y = random.randint(3, img_cols-block_noise_size_y-3)
+            noise_z = random.randint(3, img_deps-block_noise_size_z-3)
+            print(f'{noise_x}, {noise_y}, {noise_z}')
+            x[noise_x:noise_x+block_noise_size_x, 
+              noise_y:noise_y+block_noise_size_y, 
+              noise_z:noise_z+block_noise_size_z] = np.random.rand(block_noise_size_x, 
+                                                                   block_noise_size_y, 
+                                                                   block_noise_size_z, ) * 1.0
+            cnt-=1
+        return x
 
     def _image_out_painting(x):
         img_rows, img_cols, img_deps = x.shape
