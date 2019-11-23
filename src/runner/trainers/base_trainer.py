@@ -61,6 +61,7 @@ class BaseTrainer:
             valid_log, valid_batch, valid_outputs = self._run_epoch('validation')
             logging.info(f'Valid log: {valid_log}.')
 
+
             # Adjust the learning rate.
             if self.lr_scheduler is None:
                 pass

@@ -5,6 +5,5 @@ subset5,Training
 subset3,Training
 subset1,Training
 subset4,Training
-subset0,Training
+subset0,Validation
 subset6,Validation
-subset9,Validation

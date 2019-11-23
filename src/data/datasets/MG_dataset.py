@@ -20,12 +20,13 @@ class MGDataset(BaseDataset):
         transforms (list of Box): The preprocessing techniques applied to the data.
         augments (list of Box): The augmentation techniques applied to the training data (default: None).
     """
-    def __init__(self, data_split_csv, train_preprocessings, valid_preprocessings, transforms, augments=None, **kwargs):
+    def __init__(self, data_split_csv, train_preprocessings, valid_preprocessings, transforms, to_tensor, augments=None, **kwargs):
         super().__init__(**kwargs)
         self.data_split_csv = data_split_csv
         self.train_preprocessings = compose(train_preprocessings)
         self.valid_preprocessings = compose(valid_preprocessings)
         self.transforms = compose(transforms)
+        self.to_tensor = compose(to_tensor)
         self.augments = compose(augments)
         self.data_paths = []
 
@@ -57,8 +58,9 @@ class MGDataset(BaseDataset):
         elif self.type == 'valid':
             image, label = self.valid_preprocessings(image, label, normalize_tags=[True, True], target=label, target_label=2)
         # transformations
-        image, label = self.transforms(image, label, dtypes=[torch.float, torch.float])
+        image = self.transforms(image, dtypes=[torch.float])
 
+        image, label = self.to_tensor(image, label)
         # (H, W, D, C) -> (C, D, H, W)
         image, label = image.permute(3, 2, 0, 1).contiguous(), label.permute(3, 2, 0, 1).contiguous()
 

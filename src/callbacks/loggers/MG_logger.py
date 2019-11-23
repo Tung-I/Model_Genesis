@@ -36,11 +36,12 @@ class MGLogger(BaseLogger):
         num_classes = train_output.size(1)
         train_img = make_grid(train_batch['image'][:, :, train_slice_id], nrow=1, normalize=True, scale_each=True, pad_value=1)
         train_label = make_grid(train_batch['label'][:, :, train_slice_id].float(), nrow=1, normalize=True, scale_each=True, range=(0, num_classes-1), pad_value=1)
-        train_pred = make_grid(train_output.argmax(dim=1, keepdim=True)[:, :, train_slice_id].float(), nrow=1, normalize=True, scale_each=True, range=(0, num_classes-1), pad_value=1)
+        train_pred = make_grid(train_output[:, :, train_slice_id].float(), nrow=1, normalize=True, scale_each=True, range=(0, num_classes-1), pad_value=1)
 
         valid_img = make_grid(valid_batch['image'][:, :, valid_slice_id], nrow=1, normalize=True, scale_each=True, pad_value=1)
         valid_label = make_grid(valid_batch['label'][:, :, valid_slice_id].float(), nrow=1, normalize=True, scale_each=True, range=(0, num_classes-1), pad_value=1)
-        valid_pred = make_grid(valid_output.argmax(dim=1, keepdim=True)[:, :, valid_slice_id].float(), nrow=1, normalize=True, scale_each=True, range=(0, num_classes-1), pad_value=1)
+        valid_pred = make_grid(valid_output[:, :, valid_slice_id].float(), nrow=1, normalize=True, scale_each=True, range=(0, num_classes-1), pad_value=1)
+
 
         train_grid = torch.cat((train_img, train_label, train_pred), dim=-1)
         valid_grid = torch.cat((valid_img, valid_label, valid_pred), dim=-1)

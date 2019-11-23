@@ -14,7 +14,7 @@ dataset:
                   hu_min: -1000.
             - name: 'RandomCrop'
               kwargs:
-                  size: [128, 128, 24]
+                  size: [196, 196, 24]
         valid_preprocessings:
             - name: 'HUNormalize'
               kwargs:
@@ -22,7 +22,7 @@ dataset:
                   hu_min: -1000.
             - name: 'RandomCrop'
               kwargs:
-                  size: [128, 128, 24]
+                  size: [196, 196, 24]
         # augments:
         #     - name: 'RandomElasticDeformation'
         #     - name: 'RandomHorizontalFlip'
@@ -30,17 +30,18 @@ dataset:
         transforms:
             - name: 'NonLinearTransform'
               kwargs:
-                  prob: 0.3
+                  prob: 0.5
             - name: 'LocalPixelShuffling'
               kwargs:
                   x_size: 10
                   y_size: 10
                   z_size: 10
-                  prob: 0.3
+                  prob: 0.5
             - name: 'InOutPainting'
               kwargs:
-                  paint_rate: 0.3
+                  paint_rate: 0.5
                   inpaint_rate: 0.5
+        to_tensor:
             - name: 'ToTensor'
             
 dataloader:

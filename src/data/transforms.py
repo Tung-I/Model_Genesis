@@ -2,6 +2,7 @@ import torch
 import random
 import functools
 import numpy as np
+import copy
 import SimpleITK as sitk
 from scipy.special import comb
 from skimage.transform import resize
@@ -184,8 +185,8 @@ class NonLinearTransform(BaseTransform):
         _imgs = []
         for img in imgs:
             img = np.squeeze(img)
-            print(img.shape)
-            img = self._nonlinear_transform(img, self.prob)
+            img = self.nonlinear_transform(img)
+            img = np.expand_dims(img, 3)
             _imgs.append(img)
         imgs = tuple(_imgs)
         return imgs
@@ -197,7 +198,7 @@ class NonLinearTransform(BaseTransform):
         """
         return comb(n, i) * ( t**(n-i) ) * (1 - t)**i
 
-    def _bezier_curve(points, nTimes=1000):
+    def bezier_curve(self, points, nTimes=1000):
         """
            Given a set of control points, return the
            bezier curve defined by the control points.
@@ -214,21 +215,20 @@ class NonLinearTransform(BaseTransform):
 
         t = np.linspace(0.0, 1.0, nTimes)
 
-        polynomial_array = np.array([ _bernstein_poly(i, nPoints-1, t) for i in range(0, nPoints)   ])
+        polynomial_array = np.array([ self._bernstein_poly(i, nPoints-1, t) for i in range(0, nPoints)   ])
         
         xvals = np.dot(xPoints, polynomial_array)
         yvals = np.dot(yPoints, polynomial_array)
 
         return xvals, yvals
 
-
-    def _nonlinear_transform(x, prob=0.5):
-        if random.random() >= prob:
+    def nonlinear_transform(self, x):
+        if random.random() >= self.prob:
             return x
         points = [[0, 0], [random.random(), random.random()], [random.random(), random.random()], [1, 1]]
         xpoints = [p[0] for p in points]
         ypoints = [p[1] for p in points]
-        xvals, yvals = _bezier_curve(points, nTimes=100000)
+        xvals, yvals = self.bezier_curve(points, nTimes=100000)
         if random.random() < 0.5:
             # Half change to get flip
             xvals = np.sort(xvals)
@@ -263,7 +263,9 @@ class LocalPixelShuffling(BaseTransform):
 
         _imgs = []
         for img in imgs:
+            img = np.squeeze(img)
             img = self._local_pixel_shuffling(img, self.x_size, self.y_size, self.z_size, self.prob)
+            img = np.expand_dims(img, 3)
             _imgs.append(img)
         imgs = tuple(_imgs)
         return imgs
@@ -331,21 +333,15 @@ class InOutPainting(BaseTransform):
 
         _imgs = []
         for img in imgs:
-            img = self._in_out_painting(img, self.paint_rate, self.inpaint_rate)
+            img = np.squeeze(img)
+            img = self.in_out_painting(img)
+            img = np.expand_dims(img, 3)
             _imgs.append(img)
         imgs = tuple(_imgs)
         return imgs
 
     @staticmethod
-    def _in_out_painting(img, paint_rate, inpaint_rate):
-        if random.random() < config.paint_rate:
-            if random.random() < config.inpaint_rate:
-                img = _image_in_painting(img)
-            else:
-                img = _image_out_painting(img)
-        return img
-
-    def _image_in_painting(x):
+    def _in_painting(x):
         img_rows, img_cols, img_deps = x.shape
         cnt = 5
         while cnt > 0 and random.random() < 0.95:
@@ -355,7 +351,6 @@ class InOutPainting(BaseTransform):
             noise_x = random.randint(3, img_rows-block_noise_size_x-3)
             noise_y = random.randint(3, img_cols-block_noise_size_y-3)
             noise_z = random.randint(3, img_deps-block_noise_size_z-3)
-            print(f'{noise_x}, {noise_y}, {noise_z}')
             x[noise_x:noise_x+block_noise_size_x, 
               noise_y:noise_y+block_noise_size_y, 
               noise_z:noise_z+block_noise_size_z] = np.random.rand(block_noise_size_x, 
@@ -364,7 +359,8 @@ class InOutPainting(BaseTransform):
             cnt-=1
         return x
 
-    def _image_out_painting(x):
+    @staticmethod
+    def _out_painting(x):
         img_rows, img_cols, img_deps = x.shape
         image_temp = copy.deepcopy(x)
         x = np.random.rand(x.shape[0], x.shape[1], x.shape[2]) * 1.0
@@ -394,6 +390,14 @@ class InOutPainting(BaseTransform):
                                                                noise_z:noise_z+block_noise_size_z]
             cnt-=1
         return x
+
+    def in_out_painting(self, img):
+        if random.random() < self.paint_rate:
+            if random.random() < self.inpaint_rate:
+                img = self._in_painting(img)
+            else:
+                img = self._out_painting(img)
+        return img
 
 
 class Normalize(BaseTransform):
