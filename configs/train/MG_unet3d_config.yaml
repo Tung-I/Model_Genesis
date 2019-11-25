@@ -39,7 +39,7 @@ dataset:
                   prob: 0.5
             - name: 'InOutPainting'
               kwargs:
-                  paint_rate: 0.5
+                  paint_rate: 0.3
                   inpaint_rate: 0.5
         to_tensor:
             - name: 'ToTensor'

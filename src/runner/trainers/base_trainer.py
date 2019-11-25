@@ -2,6 +2,7 @@ import torch
 import logging
 from tqdm import tqdm
 import random
+import copy
 import numpy as np
 
 
@@ -121,6 +122,8 @@ class BaseTrainer:
         for batch in trange:
             batch = self._allocate_data(batch)
             inputs, targets = self._get_inputs_targets(batch)
+
+
             if mode == 'training':
                 outputs = self.net(inputs)
                 losses = self._compute_losses(outputs, targets)

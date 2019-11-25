@@ -11,13 +11,13 @@ dataset:
             - name: 'Normalize'
             - name: 'RandomCrop'
               kwargs:
-                  size: [128, 128, 24]
+                  size: [192, 192, 24]
         valid_preprocessings:
             - name: 'Normalize'
             - name: 'PositiveCrop'
               kwargs:
                   positive_sampling_rate: 1.0
-                  size: [128, 128, 24]
+                  size: [192, 192, 24]
         # augments:
         #     - name: 'RandomElasticDeformation'
         #     - name: 'RandomHorizontalFlip'
@@ -28,7 +28,7 @@ dataset:
 dataloader:
     name: 'Dataloader'
     kwargs:
-        train_batch_size: 4
+        train_batch_size: 2
         valid_batch_size: 1
         shuffle: true
         num_workers: 4
