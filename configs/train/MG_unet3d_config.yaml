@@ -1,6 +1,6 @@
 main:
     random_seed: 'nips2019'
-    saved_dir: '/home/tony/Model_Genesis/models/MG/unet3d/train'
+    saved_dir: '/home/tony/Model_Genesis/models/MG/train'
 
 dataset:
     name: 'MGDataset'
@@ -39,7 +39,7 @@ dataset:
                   prob: 0.5
             - name: 'InOutPainting'
               kwargs:
-                  paint_rate: 0.3
+                  paint_rate: 0.5
                   inpaint_rate: 0.5
         to_tensor:
             - name: 'ToTensor'
