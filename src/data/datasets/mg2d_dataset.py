@@ -5,6 +5,7 @@ import numpy as np
 import nibabel as nib
 import copy
 import SimpleITK as sitk
+from pathlib import Path
 
 from src.data.datasets.base_dataset import BaseDataset
 # from src.data.transforms import compose
@@ -46,6 +47,7 @@ class MG2DDataset(BaseDataset):
 
     def __getitem__(self, index):
         image_path = self.data_paths[index]
+        image_path = Path(self.data_dir) / Path(image_path)
         image = np.load(image_path)
 
         hu_max = 1000

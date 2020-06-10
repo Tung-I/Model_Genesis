@@ -5,7 +5,7 @@ main:
 dataset:
     name: 'MG2DDataset'
     kwargs:
-        data_dir: '/home/tony/datasets/LUNA'
+        data_dir: '/home/tony/datasets/LUNA/luna_2d'
         data_split_csv: '/home/tony/Model_Genesis/luna_9_1.csv'
         train_preprocessings:
             # - name: 'HUNormalize'
