@@ -1,3 +1,1 @@
-from .vipcup_seg_dataset import VIPCUPSegDataset
-from .kits_seg_dataset import KitsSegDataset
-from .MG_dataset import MGDataset
+from .mg2d_dataset import MG2DDataset

@@ -5,7 +5,8 @@ import numpy as np
 import nibabel as nib
 from tqdm import tqdm
 
-from src.data.transforms import compose
+# from src.data.transforms import compose
+from src.data.transforms import Compose, ToTensor
 
 
 class VIPCUPSegPredictor(object):

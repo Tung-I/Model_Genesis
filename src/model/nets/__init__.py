@@ -1,6 +1,1 @@
-from .unet3d import UNet3D
-from .dense_highres3d_net import DenseHighRes3DNet
-from .highres3d_net import HighRes3DNet
-from .deeplabv3plus import DeepLabV3Plus
-from .vnet import VNet
-from .MG_unet3d import MGUNet3D
+from .mg2d_unet import UNet2D

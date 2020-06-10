@@ -1,0 +1,86 @@
+main:
+    random_seed: 'cvpr2021'
+    saved_dir: '/home/tony/Model_Genesis/models/mg2d/train'
+
+dataset:
+    name: 'MG2DDataset'
+    kwargs:
+        data_dir: '/home/tony/datasets/LUNA'
+        data_split_csv: '/home/tony/Model_Genesis/luna_9_1.csv'
+        train_preprocessings:
+            # - name: 'HUNormalize'
+            #   kwargs:
+            #       hu_max: 1000.
+            #       hu_min: -1000.
+            - name: 'RandomCrop'
+              kwargs:
+                  size: [320, 320]
+        valid_preprocessings:
+            # - name: 'HUNormalize'
+            #   kwargs:
+            #       hu_max: 1000.
+            #       hu_min: -1000.
+            - name: 'RandomCrop'
+              kwargs:
+                  size: [320, 320]
+        transforms:
+            - name: 'NonLinearTransform'
+              kwargs:
+                  prob: 0.5
+            - name: 'LocalPixelShuffling'
+              kwargs:
+                  prob: 0.5
+            - name: 'Painting'
+              kwargs:
+                  prob: 0.5
+                  inpaint_rate: 0.5
+        to_tensor:
+            - name: 'ToTensor'
+            
+dataloader:
+    name: 'Dataloader'
+    kwargs:
+        train_batch_size: 24
+        valid_batch_size: 1
+        shuffle: true
+        num_workers: 8
+
+net:
+    name: 'UNet2D'
+    kwargs:
+        in_channels: 1
+        out_channels: 1
+        num_features: [32, 64, 128, 256, 512]
+        
+losses:
+    - name: 'MSELoss'
+      weight: 1.0
+
+metrics:
+    - name: 'MSE'
+
+optimizer:
+    name: 'Adam'
+    kwargs:
+        lr: 0.001
+        weight_decay: 0
+        amsgrad: false
+
+logger:
+    name: 'MG2DLogger'
+    kwargs:
+        dummy_input: [16, 1, 128, 128]
+
+monitor:
+    name: 'Monitor'
+    kwargs:
+        mode: 'min'
+        target: 'Loss'
+        saved_freq: 50
+        early_stop: 0
+
+trainer:
+    name: 'MGTrainer'
+    kwargs:
+        device: 'cuda:0'
+        num_epochs: 400
